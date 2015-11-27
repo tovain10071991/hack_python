@@ -438,6 +438,9 @@ PyInt_FromUnicode(Py_UNICODE *s, Py_ssize_t length, int base)
         return Py_NotImplemented;               \
     }
 
+static int value[10];		//用来存前10个小整数
+static int refcounts[10];	//用来存前10个小整数的引用数
+
 /* ARGSUSED */
 static int
 int_print(PyIntObject *v, FILE *fp, int flags)
@@ -445,7 +448,47 @@ int_print(PyIntObject *v, FILE *fp, int flags)
 {
     long int_val = v->ob_ival;
     Py_BEGIN_ALLOW_THREADS
-    fprintf(fp, "%ld", int_val);
+    
+	//打印整数对象的地址，前8个小整数对象的引用数，block的个数，free_list的指针值
+	PyIntObject* intObjectPtr;
+	PyIntBlock* p = block_list;		//工作指针
+	PyIntBlock* last = NULL;
+	int count = 0;					//用来统计block的个数
+	int i;
+
+	while(p != NULL)			//遍历block_list，统计block的个数
+	{
+		++count;
+		last = p;	//最终last会指向最后一块，也就是最先创建的block，在初始化小整数对象池的时候创建的
+		p = p->next;
+	}
+
+	intObjectPtr = last->objects;
+	intObjectPtr += N_INTOBJECTS - 1;	//小整数对象在block中的倒着存放的，因为初始化的时候是先从后端去空间的(因为创建空block的时候free_list就是先指向后端的)
+	printf("address @%p\n", v);		//打印整数对象的地址
+
+	for(i = 0; i < 10; ++i, --intObjectPtr)		//这里从block_list的最后一块获取小整数而不是通过small_ints获取
+	{
+		value[i] = intObjectPtr->ob_ival;
+		refcounts[i] = intObjectPtr->ob_refcnt;
+	}
+	printf(" value : ");
+	for(i = 0; i < 8; ++i)
+	{
+		printf("%d\t", value[i]);
+	}
+	printf("\n");
+
+	printf(" refcnt : ");
+	for(i = 0;i < 8; ++i)
+	{
+		printf("%d\t", refcounts[i]);
+	}
+	printf("\n");
+
+	printf(" block_list count : %d\n", count);
+	printf(" free_list : %p\n", free_list);
+
     Py_END_ALLOW_THREADS
     return 0;
 }
